@@ -1,0 +1,392 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+    <meta charset="UTF-8">
+    <title>高中數學大富翁：先付過路費再搶奪版</title>
+    <script src="https://polyfill.io/v3/polyfill.min.js?features=es6"></script>
+    <script id="MathJax-script" async src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
+    <style>
+        :root {
+            --bg-color: #fff9f0;
+            --primary: #ff9f43;
+            --accent: #54a0ff;
+            --bank-color: #2ecc71;
+            --text-main: #3d3d3d;
+            --font-size: 26.6px;
+        }
+        body {
+            font-family: "Microsoft JhengHei", "Apple Color Emoji", "Segoe UI Emoji", sans-serif;
+            background-color: var(--bg-color);
+            color: var(--text-main);
+            margin: 0; display: flex; flex-direction: column; align-items: center;
+            font-size: var(--font-size); overflow-x: hidden;
+        }
+
+        #start-mask, #bank-mask {
+            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(0,0,0,0.85); z-index: 5000;
+            display: flex; justify-content: center; align-items: center;
+        }
+        #setup-box, #bank-box {
+            background: white; padding: 30px; border-radius: 30px; text-align: center;
+            border: 8px solid var(--primary); width: 600px; max-height: 90vh; overflow-y: auto;
+        }
+        #bank-box { border-color: var(--bank-color); }
+        .player-edit-item { display: flex; align-items: center; justify-content: space-between; padding: 8px; border-bottom: 1px solid #eee; }
+        .name-input { font-size: 18px; padding: 5px; border-radius: 5px; border: 1px solid #ccc; width: 150px; }
+
+        #header {
+            width: 100%; padding: 15px 0; background: white;
+            box-shadow: 0 4px 10px rgba(0,0,0,0.1); border-bottom: 5px solid var(--primary);
+            display: flex; flex-direction: column; align-items: center;
+        }
+        #turn-indicator {
+            background: #fff3e0; border: 3px solid var(--primary);
+            padding: 10px 40px; border-radius: 50px; display: flex; align-items: center; gap: 20px;
+            animation: pulse 2s infinite ease-in-out;
+        }
+        @keyframes pulse { 0%, 100% { transform: scale(1); } 50% { transform: scale(1.05); } }
+
+        .admin-btn { cursor:pointer; border-radius: 8px; border: 1px solid #ccc; padding: 5px 12px; font-size: 18px; margin: 0 5px; transition: 0.2s; }
+        .admin-btn:hover { background: #f0f0f0; }
+        .btn-bank-open { background: var(--bank-color); color: white; border: none; font-weight: bold; }
+
+        #main-layout { display: flex; width: 98%; justify-content: center; gap: 15px; margin-top: 15px; }
+
+        #game-board {
+            display: grid; grid-template-columns: repeat(9, 130px); grid-template-rows: repeat(8, 100px);
+            gap: 8px; padding: 15px; background: #fdf2e9; border-radius: 30px; position: relative;
+        }
+        .cell {
+            background: white; border-radius: 12px; display: flex; flex-direction: column;
+            justify-content: center; align-items: center; border: 3px solid transparent;
+            position: relative; text-align: center; font-size: 16px; transition: 0.3s;
+        }
+        .cell.active { border-color: var(--primary); background: #fff4e6; z-index: 5; box-shadow: 0 0 20px var(--primary); }
+        .cell-price { color: #e67e22; font-weight: bold; }
+        .owner-tag { position: absolute; top: 2px; right: 2px; font-size: 28px; background: rgba(255,255,255,0.7); border-radius: 50%; }
+        .p-tokens { display: flex; flex-wrap: wrap; justify-content: center; position: absolute; bottom: 2px; width: 100%; font-size: 22px; pointer-events: none; }
+
+        .center-area {
+            grid-column: 2 / 9; grid-row: 2 / 8;
+            display: flex; flex-direction: column; justify-content: center; align-items: center;
+            border-radius: 40px; margin: 10px; position: relative; overflow: hidden;
+            background: linear-gradient(135deg, #fff9f0 0%, #e0f7fa 25%, #fff9f0 50%, #fce4ec 75%, #fff9f0 100%);
+            border: 8px solid #ffcc80; box-shadow: inset 0 0 20px rgba(255, 204, 128, 0.5);
+        }
+
+        .math-symbol-fx {
+            position: absolute; color: rgba(84, 160, 255, 0.15);
+            font-family: serif; font-style: italic; font-weight: bold;
+            pointer-events: none; z-index: 1; animation: floatMath 6s infinite linear;
+        }
+        @keyframes floatMath {
+            0% { transform: translateY(0px) rotate(0deg); opacity: 0; }
+            10% { opacity: 1; }
+            90% { opacity: 1; }
+            100% { transform: translateY(-120px) rotate(360deg); opacity: 0; }
+        }
+
+        #dice-container { display: flex; gap: 20px; align-items: center; justify-content: center; }
+        .dice-btn { font-size: 80px; background:none; border:none; cursor: pointer; }
+        .dice-shake { animation: shake 0.1s infinite alternate; }
+        @keyframes shake { from { transform: translate(2px, 2px); } to { transform: translate(-2px, -2px); } }
+        
+        #dice-res-sum { font-size: 35px; color: #d35400; font-weight: bold; margin-top: 5px; }
+
+        #player-scroller { width: 95%; overflow-x: auto; white-space: nowrap; padding: 15px; margin-top: 10px; }
+        .p-card {
+            display: inline-block; width: 130px; padding: 10px; margin-right: 10px;
+            background: white; border-radius: 15px; text-align: center; border: 3px solid #eee; font-size: 20px;
+        }
+        .p-card.current { border-color: var(--primary); background: #fff3e0; box-shadow: 0 0 10px rgba(255, 159, 67, 0.5); transform: translateY(-5px); }
+
+        .modal { display: none; position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); background: white; padding: 35px; border-radius: 35px; box-shadow: 0 0 150px rgba(0,0,0,0.5); z-index: 6000; width: 580px; text-align: center; border: 10px solid var(--primary); }
+        .ans-btn { display: block; width: 100%; padding: 15px; margin: 10px 0; font-size: 28px; border-radius: 15px; border: 3px solid #eee; background: #fafafa; cursor: pointer; transition: 0.2s; }
+        .action-btn { padding: 12px 35px; margin: 10px; font-size: 24px; border-radius: 12px; border: none; cursor: pointer; font-weight: bold; }
+        .btn-buy { background: #55efc4; color: #006266; }
+        .btn-skip { background: #fab1a0; color: #c0392b; }
+        .btn-info { background: #3498db; color: white; }
+    </style>
+</head>
+<body>
+
+<div id="start-mask">
+    <div id="setup-box">
+        <h2 style="color:var(--primary)">🎲 遊戲初始設定</h2>
+        <div id="player-config-list" style="text-align: left; margin: 20px 0; border: 1px solid #eee; padding: 10px; border-radius: 10px; max-height: 300px; overflow-y: auto;"></div>
+        <div>
+            <span>起始玩家：</span>
+            <select id="first-player-select" style="font-size: 20px; padding: 5px; border-radius: 10px;"></select>
+        </div>
+        <br>
+        <button class="action-btn btn-buy" onclick="confirmStart()" style="width: 100%;">進入遊戲</button>
+    </div>
+</div>
+
+<div id="bank-mask" style="display:none;">
+    <div id="bank-box">
+        <h2 style="color:var(--bank-color)">🏦 老師管理銀行</h2>
+        <select id="bank-target-select" class="bank-select" style="width: 80%; padding:10px; font-size: 20px; border-radius:10px; margin-bottom:15px;"><option value="all">-- 全體玩家 --</option></select>
+        <div style="margin: 20px 0;">
+            <button class="action-btn btn-buy" onclick="setBankOp(1)">➕ 贈與</button>
+            <button class="action-btn btn-skip" onclick="setBankOp(-1)">➖ 扣錢</button>
+        </div>
+        <div style="margin: 20px 0;">
+            <label>金額：$</label>
+            <input type="number" id="bank-amount" class="bank-input" value="100" style="width:100px; font-size:24px; text-align:center;">
+        </div>
+        <button class="action-btn btn-info" onclick="confirmBankAction()" style="background:var(--bank-color);">確認執行</button>
+        <button class="action-btn btn-skip" onclick="closeBank()">取消</button>
+    </div>
+</div>
+
+<div id="header">
+    <div id="turn-indicator">
+        <span style="font-size: 22px; font-weight: bold;">輪到：</span>
+        <span id="p-name-disp" style="font-size: 35px; font-weight: 900; color: #d35400;">載入中</span>
+        <span id="p-icon-disp" style="font-size: 45px;"></span>
+    </div>
+    <div style="margin-top: 10px;">
+        <button class="admin-btn btn-bank-open" onclick="openBank()">🏦 銀行管理</button>
+        <button class="admin-btn" onclick="saveManual()">💾 存檔</button>
+        <button class="admin-btn" onclick="toggleFullScreen()">🖥️ 全螢幕</button>
+        <button class="admin-btn" onclick="resetGame()" style="color:red;">🧹 重置</button>
+    </div>
+</div>
+
+<div id="main-layout">
+    <div id="game-board">
+        <div class="center-area" id="center-fx-zone">
+            <div id="dice-container">
+                <button id="dice-btn-1" class="dice-btn">🎲</button>
+                <button id="dice-btn-2" class="dice-btn">🎲</button>
+            </div>
+            <button class="action-btn btn-buy" id="roll-trigger" onclick="rollDice()" style="font-size: 20px;">按此擲雙骰</button>
+            <div id="dice-res-sum"></div>
+            <div id="steal-mode-indicator" style="display:none; color:red; font-weight:bold; font-size:22px; margin-top:10px;">⚡ 搶奪模式已開啟 ⚡</div>
+        </div>
+    </div>
+    <div id="leaderboard" style="width: 260px; background: white; border: 4px solid var(--accent); border-radius: 20px; padding: 15px; height: fit-content;">
+        <h3 style="text-align: center; color: var(--accent);">👑 排行榜</h3>
+        <div id="rank-list"></div>
+    </div>
+</div>
+
+<div id="player-scroller"><div id="player-list"></div></div>
+
+<div id="math-modal" class="modal"><h2 style="color:#d35400;">📐 數學挑戰</h2><div id="q-text" style="font-size: 45px; margin: 30px 0; color: #2c3e50;"></div><div id="q-options"></div></div>
+<div id="buy-modal" class="modal"><h2 style="color:#2ecc71;">正確！獲得 $100</h2><p id="buy-info" style="margin: 20px 0; font-weight:bold;"></p><button class="action-btn btn-buy" id="buy-confirm-btn" onclick="confirmBuy(true)">買地</button><button class="action-btn btn-skip" onclick="confirmBuy(false)">不買</button></div>
+<div id="info-modal" class="modal"><h2 id="info-title">📢 通知</h2><p id="info-content" style="margin: 25px 0; font-weight:bold;"></p><button class="action-btn btn-info" onclick="closeInfo()">確定</button></div>
+<div id="event-modal" class="modal"><h2 id="ev-title">✨ 機會與命運</h2><p id="ev-content" style="margin: 25px 0; font-size: 30px; color: #8e44ad; font-weight: bold;"></p><button class="action-btn btn-info" onclick="closeEvent()">知道了</button></div>
+
+<script>
+    const playersInfo = [{id:"1號",icon:"🐻"},{id:"2號",icon:"🐱"},{id:"3號",icon:"🦎"},{id:"4號",icon:"🍤"},{id:"5號",icon:"🐧"},{id:"6號",icon:"🦉"},{id:"7號",icon:"🐰"},{id:"9號",icon:"辨"},{id:"10號",icon:"🐶"},{id:"11號",icon:"🦁"},{id:"12號",icon:"🐨"},{id:"13號",icon:"🐼"},{id:"15號",icon:"🐸"},{id:"17號",icon:"🐷"},{id:"18號",icon:"🐣"},{id:"19號",icon:"🦋"},{id:"20號",icon:"REX"},{id:"22號",icon:"🦄"},{id:"24號",icon:"🐝"},{id:"25號",icon:"🦀"},{id:"26號",icon:"🐳"},{id:"27號",icon:"🐙"},{id:"28號",icon:"🐹"},{id:"29號",icon:"🐿️"},{id:"30號",icon:"🦜"},{id:"31號",icon:"🍀"}];
+    const cellNames = ["起點🚩","白熊屋","炸豬排角","機會🎁","蜥蜴湖","粉圓公園","雜草原","真蜥蜴森","蝸牛徑","幽靈咖啡","命運🔮","小山腳","裹布店","炸蝦尾","麻雀窩","梟之木","鼴鼠洞","秘密基地","機會🎁","蛋黃派","草莓塔","布丁丘","可樂餅","壽司台","拉麵林","命運🔮","鬆餅場","小火車","噴水池","隱角落"];
+
+    let players = [], currentIdx = 0, cells = [], mathPool = [], isMoving = false, currentBankOp = 1, stealMode = false;
+    const diceIcons = ["⚀","⚁","⚂","⚃","⚄","⚅"];
+
+    function generateMathPool() {
+        let pool = [];
+        const tri = [{q:'\\sin 90^\\circ', a:'1'}, {q:'\\cos 90^\\circ', a:'0'}, {q:'\\tan 45^\\circ', a:'1'}];
+        for(let i=0; i<60; i++){ let it = tri[Math.floor(Math.random()*tri.length)]; pool.push({q:it.q, a:it.a, o:shuffleOpts(it.a,['0','1','-1'])})}
+        for(let i=0; i<60; i++){ let b=[2,3,10][Math.floor(Math.random()*3)], x=Math.floor(Math.random()*3)+1; pool.push({q:`\\log_{${b}} ${Math.pow(b,x)}`, a:x.toString(), o:shuffleOpts(x.toString(),['1','2','3'])})}
+        for(let i=0; i<60; i++){ let n=Math.floor(Math.random()*10)+2; pool.push({q:`\\sqrt{${n*n}}`, a:n.toString(), o:shuffleOpts(n.toString(),[(n+1).toString(),'10','12'])})}
+        return pool.sort(()=>Math.random()-0.5);
+    }
+    function shuffleOpts(c, p){ let s=new Set([c]); while(s.size<4){s.add(p[Math.floor(Math.random()*p.length)])} return Array.from(s).sort(()=>Math.random()-0.5); }
+
+    const gridMap = [[1,1],[1,2],[1,3],[1,4],[1,5],[1,6],[1,7],[1,8],[1,9],[2,9],[3,9],[4,9],[5,9],[6,9],[7,9],[8,9],[8,8],[8,7],[8,6],[8,5],[8,4],[8,3],[8,2],[8,1],[7,1],[6,1],[5,1],[4,1],[3,1],[2,1]];
+
+    function init() {
+        const saved = localStorage.getItem('monopoly_math_v9');
+        if(saved) {
+            const d = JSON.parse(saved);
+            players = d.players; cells = d.cells; currentIdx = d.currentIdx; mathPool = d.mathPool || generateMathPool();
+            document.getElementById('start-mask').style.display = 'none';
+            checkStealMode();
+        } else {
+            const configList = document.getElementById('player-config-list');
+            const select = document.getElementById('first-player-select');
+            playersInfo.forEach((p, idx) => {
+                configList.innerHTML += `<div class="player-edit-item"><span>${p.icon}</span> <input type="text" class="name-input" id="name-${idx}" value="${p.id}"></div>`;
+                select.innerHTML += `<option value="${idx}">${p.icon} ${p.id}</option>`;
+            });
+            mathPool = generateMathPool();
+            players = playersInfo.map(p => ({ ...p, money: 500, pos: 0, name: p.id }));
+            for(let i=0; i<30; i++) {
+                if(i===0) cells[i] = { type:'start' };
+                else if(cellNames[i].includes('機會') || cellNames[i].includes('命運')) cells[i] = { type:'event' };
+                else cells[i] = { type:'land', owner: null, price: Math.floor(Math.random()*151)+50 };
+            }
+        }
+        renderBoard(); updateUI(); updateTurnDisplay(); createMathFX(); updateBankTargetList();
+    }
+
+    function checkStealMode() {
+        const allOccupied = cells.filter(c => c.type === 'land').every(c => c.owner !== null);
+        if (allOccupied) { stealMode = true; document.getElementById('steal-mode-indicator').style.display = 'block'; }
+    }
+
+    function rollDice() {
+        if(isMoving) return;
+        isMoving = true; document.getElementById('roll-trigger').disabled = true;
+        const d1 = document.getElementById('dice-btn-1'), d2 = document.getElementById('dice-btn-2'), resSum = document.getElementById('dice-res-sum');
+        d1.classList.add('dice-shake'); d2.classList.add('dice-shake');
+        let rollInt = setInterval(() => { d1.innerText = diceIcons[Math.floor(Math.random()*6)]; d2.innerText = diceIcons[Math.floor(Math.random()*6)]; }, 80);
+        setTimeout(() => {
+            clearInterval(rollInt);
+            d1.classList.remove('dice-shake'); d2.classList.remove('dice-shake');
+            let s1 = Math.floor(Math.random()*6)+1, s2 = Math.floor(Math.random()*6)+1, total = s1 + s2;
+            d1.innerText = diceIcons[s1-1]; d2.innerText = diceIcons[s2-1]; resSum.innerText = `合計：${total} 步`;
+            let oldPos = players[currentIdx].pos;
+            players[currentIdx].pos = (players[currentIdx].pos + total) % 30;
+            setTimeout(() => { updateUI(); if(players[currentIdx].pos < oldPos && players[currentIdx].pos !== 0) { players[currentIdx].money += 100; showNotify("💰 起點獎勵", "領取 $100！", doLanding); } else doLanding(); }, 800);
+        }, 1000);
+    }
+
+    function doLanding() {
+        const p = players[currentIdx], cell = cells[p.pos];
+        document.querySelectorAll('.cell').forEach(c => c.classList.remove('active'));
+        document.getElementById(`cell-${p.pos}`).classList.add('active');
+        if(p.pos === 0) { nextTurn(); return; }
+        if(cell.type === 'event') { triggerEvent(); return; }
+
+        if(cell.owner === null) { 
+            if(mathPool.length === 0) mathPool = generateMathPool();
+            showMath(mathPool.pop()); 
+        } else if(cell.owner === currentIdx) {
+            nextTurn();
+        } else {
+            // 停在別人的領地：先付過路費
+            const owner = players[cell.owner];
+            p.money -= 50; owner.money += 50;
+            updateUI();
+            
+            if (stealMode) {
+                showNotify("🏧 過路費", `支付 $50 給 ${owner.name}。由於領地全滿，進入搶奪挑戰！`, () => {
+                    showMath(mathPool.pop(), true);
+                });
+            } else {
+                showNotify("🏧 過路費", `支付 $50 給 ${owner.name}。`, nextTurn);
+            }
+        }
+    }
+
+    function showMath(q, isSteal = false) {
+        if(!q) { nextTurn(); return; }
+        const modal = document.getElementById('math-modal'), qText = document.getElementById('q-text'), box = document.getElementById('q-options');
+        qText.innerText = `\\( ${q.q} = ? \\)`; box.innerHTML = '';
+        q.o.forEach(o => {
+            const b = document.createElement('button'); b.className = 'ans-btn'; b.innerText = o;
+            b.onclick = () => { 
+                modal.style.display='none'; 
+                if(o === q.a) { players[currentIdx].money += 100; if(isSteal) showSteal(); else showBuy(); } 
+                else showNotify("❌ 答錯", "挑戰失敗，無法佔領。", nextTurn);
+            };
+            box.appendChild(b);
+        });
+        modal.style.display = 'block';
+        if(window.MathJax) MathJax.typesetPromise([qText]);
+    }
+
+    function showBuy() {
+        const cell = cells[players[currentIdx].pos];
+        document.getElementById('buy-modal').querySelector('h2').innerText = "正確！獲得 $100";
+        document.getElementById('buy-confirm-btn').innerText = "買地";
+        document.getElementById('buy-info').innerText = `${cellNames[players[currentIdx].pos]} 售價 $${cell.price}`; 
+        document.getElementById('buy-modal').style.display = 'block'; 
+    }
+
+    function showSteal() {
+        const cell = cells[players[currentIdx].pos], owner = players[cell.owner];
+        document.getElementById('buy-modal').querySelector('h2').innerText = "正確！獲得 $100";
+        document.getElementById('buy-confirm-btn').innerText = "花 $300 搶奪";
+        document.getElementById('buy-info').innerText = `搶奪 ${owner.name} 的土地需 $300 ($200給地主，$100給銀行)`;
+        document.getElementById('buy-modal').style.display = 'block';
+    }
+
+    function confirmBuy(yes) {
+        document.getElementById('buy-modal').style.display = 'none';
+        const p = players[currentIdx], cell = cells[p.pos];
+        if(yes) {
+            if (cell.owner !== null) {
+                if (p.money < 300) { showNotify("💸 錢不夠", "無法支付 $300 搶奪費。", nextTurn); return; }
+                p.money -= 300; players[cell.owner].money += 200; cell.owner = currentIdx;
+                showNotify("⚔️ 搶奪成功", "你已成為新地主！", nextTurn);
+            } else {
+                if (p.money < cell.price) { showNotify("💸 錢不夠", "餘額不足。", nextTurn); return; }
+                p.money -= cell.price; cell.owner = currentIdx; checkStealMode(); nextTurn();
+            }
+            renderBoard();
+        } else nextTurn();
+    }
+
+    function triggerEvent() {
+        const evs = [{c:"幸運之神：得 $100", r:()=>{players[currentIdx].money+=100; nextTurn();}}, {c:"意外驚嚇：扣 $50", r:()=>{players[currentIdx].money=Math.max(0, players[currentIdx].money-50); nextTurn();}}];
+        const ev = evs[Math.floor(Math.random()*evs.length)];
+        document.getElementById('ev-content').innerText = ev.c;
+        window.evRun = ev.r; document.getElementById('event-modal').style.display='block';
+    }
+    function closeEvent(){ document.getElementById('event-modal').style.display='none'; window.evRun(); }
+
+    function nextTurn() {
+        currentIdx = (currentIdx + 1) % players.length;
+        isMoving = false; document.getElementById('roll-trigger').disabled = false;
+        document.getElementById('dice-res-sum').innerText = ""; 
+        updateUI(); updateTurnDisplay(); saveAuto();
+    }
+
+    function renderBoard() {
+        const board = document.getElementById('game-board');
+        board.querySelectorAll('.cell').forEach(c => c.remove());
+        gridMap.forEach((pos, i) => {
+            const div = document.createElement('div'); div.className = 'cell'; div.id = `cell-${i}`;
+            div.style.gridRow = pos[0]; div.style.gridColumn = pos[1];
+            if(i === 0) div.innerHTML = `起點🚩`;
+            else if(cells[i].type === 'event') div.innerHTML = cellNames[i];
+            else {
+                div.innerHTML = `<span>${cellNames[i]}</span><span class="cell-price">$${cells[i].price}</span>`;
+                if(cells[i].owner !== null) div.innerHTML += `<div class="owner-tag">${players[cells[i].owner].icon}</div>`;
+            }
+            div.innerHTML += `<div class="p-tokens" id="tokens-${i}"></div>`;
+            board.appendChild(div);
+        });
+        updateUI();
+    }
+
+    function updateUI() {
+        document.querySelectorAll('.p-tokens').forEach(t => t.innerHTML = '');
+        players.forEach(p => { const d = document.getElementById(`tokens-${p.pos}`); if(d) d.innerText += p.icon; });
+        const list = document.getElementById('player-list'); list.innerHTML = '';
+        players.forEach((p, i) => { list.innerHTML += `<div class="p-card ${i===currentIdx ? 'current' : ''}">${p.icon}<br>${p.name}<br><b>$${p.money}</b></div>`; });
+        const sorted = [...players].sort((a,b)=>b.money-a.money).slice(0,8);
+        const rl = document.getElementById('rank-list'); rl.innerHTML = '';
+        sorted.forEach((p,i)=> rl.innerHTML += `<div class="rank-item"><span>${i+1}.${p.icon}${p.name}</span><span>$${p.money}</span></div>`);
+    }
+
+    function updateTurnDisplay() { document.getElementById('p-name-disp').innerText = players[currentIdx].name; document.getElementById('p-icon-disp').innerText = players[currentIdx].icon; }
+    function showNotify(t, c, cb) { document.getElementById('info-title').innerText = t; document.getElementById('info-content').innerText = c; document.getElementById('info-modal').style.display='block'; window.infoCb = cb; }
+    function closeInfo() { document.getElementById('info-modal').style.display='none'; if(window.infoCb) window.infoCb(); }
+    function confirmStart() { 
+        players.forEach((p, i) => p.name = document.getElementById(`name-${i}`).value || p.id);
+        currentIdx = parseInt(document.getElementById('first-player-select').value);
+        document.getElementById('start-mask').style.display = 'none';
+        renderBoard(); updateTurnDisplay(); saveAuto(); 
+    }
+    function toggleFullScreen() { if (!document.fullscreenElement) document.documentElement.requestFullscreen(); else document.exitFullscreen(); }
+    function createMathFX() { setInterval(() => { const span = document.createElement('span'); span.className = 'math-symbol-fx'; span.innerText = ['π', 'Σ', '√x'][Math.floor(Math.random()*3)]; span.style.left = Math.random()*90+'%'; span.style.top='100%'; document.getElementById('center-fx-zone').appendChild(span); setTimeout(()=>span.remove(), 6000); }, 1200); }
+    function saveAuto() { localStorage.setItem('monopoly_math_v9', JSON.stringify({players, cells, currentIdx, mathPool})); }
+    function saveManual() { saveAuto(); alert("存檔成功"); }
+    function resetGame() { if(confirm("確定重置？")) { localStorage.removeItem('monopoly_math_v9'); location.reload(); } }
+    function openBank() { document.getElementById('bank-mask').style.display = 'flex'; updateBankTargetList(); }
+    function closeBank() { document.getElementById('bank-mask').style.display = 'none'; }
+    function updateBankTargetList() { const sel = document.getElementById('bank-target-select'); sel.innerHTML = '<option value="all">-- 全體玩家 --</option>'; players.forEach((p, idx) => { sel.innerHTML += `<option value="${idx}">${p.icon} ${p.name}</option>`; }); }
+    function setBankOp(op) { currentBankOp = op; }
+    function confirmBankAction() { const target = document.getElementById('bank-target-select').value, amt = parseInt(document.getElementById('bank-amount').value) || 0; if(target==='all') players.forEach(p => p.money = Math.max(0, p.money + amt*currentBankOp)); else players[target].money = Math.max(0, players[target].money + amt*currentBankOp); updateUI(); saveAuto(); closeBank(); }
+
+    window.onload = init;
+</script>
+</body>
+</html>
